@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
-	db "github.homedepot.com/EMC4JQ2/docker-go-api/database"
+	"github.homedepot.com/EMC4JQ2/docker-go-api/database"
 )
 
 type Product struct {
+	db           database.DBCaller
 	Id           int
 	Name         string
 	Brand        string
@@ -24,13 +25,19 @@ type Product struct {
 	DepartmentId int       `json:"department_id" db:"department_id"`
 }
 
-
+func GetHandlers(dbcaller database.DBCaller) Product {
+	return Product{db: dbcaller}
+}
 
 func (p *Product) GetAll(w http.ResponseWriter, r *http.Request) {
 	var retArr []Product
-	rows, err := db.GetFromDB("select * from products;")
+	rows, err := p.db.GetFromDB("select * from products;")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if rows == nil {
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 	for rows.Next() {
@@ -58,7 +65,7 @@ func (p *Product) PostNew(w http.ResponseWriter, r *http.Request) {
 	}
 	query := fmt.Sprintf("INSERT INTO products (name, brand, description, sku, rating, price, department_id) VALUES ('%v', '%v', '%v', '%v', %v, %v, %v) returning id;", p.Name, p.Brand, p.Description, p.Sku, p.Rating, p.Price, p.DepartmentId)
 	fmt.Println(query)
-	id, err := db.AddToDB(query)
+	id, err := p.db.AddToDB(query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -68,15 +75,14 @@ func (p *Product) PostNew(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Product) GetOne(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
+	id, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/api/products/"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	p.Id = id
 	query := fmt.Sprintf("SELECT * FROM products WHERE id = %v", id)
-	row := db.GetOneFromDB(query)
+	row := p.db.GetOneFromDB(query)
 	err = row.Scan(&p.Id, &p.Name, &p.Brand, &p.Description, &p.Sku, &p.Rating, &p.Price, &p.CreatedAt, &p.UpdatedAt, &p.DepartmentId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -96,9 +102,15 @@ func (p *Product) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to decode "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	id, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/api/products/"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	p.Id = id
 	query := fmt.Sprintf("UPDATE products SET name = '%v', brand = '%v', description = '%v', sku = '%v', rating = %v, price = %v, department_id = %v  WHERE id = %v;", p.Name, p.Brand, p.Description, p.Sku, p.Rating, p.Price, p.DepartmentId, p.Id)
 	fmt.Println(query)
-	err := db.AlterInDB(query)
+	err = p.db.AlterInDB(query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -108,15 +120,14 @@ func (p *Product) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Product) Remove(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
+	id, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/api/products/"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	p.Id = id
 	query := fmt.Sprintf("DELETE FROM products WHERE id = %v ;", p.Id)
-	err = db.AlterInDB(query)
+	err = p.db.AlterInDB(query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
