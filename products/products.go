@@ -82,7 +82,7 @@ func (p *Product) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/api/products/"))
-
+	fmt.Println(id, " updating")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -91,6 +91,7 @@ func (p *Product) Update(w http.ResponseWriter, r *http.Request) {
 	for i, prod := range allproducts {
 		if prod.Id == id {
 			allproducts[i] = *p
+			allproducts[i].Id = id
 			found = true
 		}
 	}
@@ -99,7 +100,7 @@ func (p *Product) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("Updated item with id: %v", p.Id)))
+	w.Write([]byte(fmt.Sprintf("Updated item with id: %v", id)))
 }
 
 func (p *Product) Remove(w http.ResponseWriter, r *http.Request) {
@@ -111,18 +112,20 @@ func (p *Product) Remove(w http.ResponseWriter, r *http.Request) {
 	found := false
 	newProducts := []Product{}
 	for _, v := range allproducts {
+		fmt.Println(id, v.Id)
+		fmt.Println(v)
 		if v.Id != id {
 			newProducts = append(newProducts, v)
 		} else {
 			found = true
 		}
 	}
-	if !found {
+	if found == false {
 		http.Error(w, "Product with that id does not exist", http.StatusBadRequest)
 		return
 	} else {
 		allproducts = newProducts
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("Deleted item with id: %v", p.Id)))
+	w.Write([]byte(fmt.Sprintf("Deleted item with id: %v", id)))
 }

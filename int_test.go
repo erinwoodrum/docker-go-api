@@ -7,28 +7,17 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.homedepot.com/EMC4JQ2/docker-go-api/database"
 	"github.homedepot.com/EMC4JQ2/docker-go-api/products"
 )
 
 var handlers products.Product
 
 func setup() {
-	conn := map[string]string{
-		"host":     os.Getenv("DB_HOST"),
-		"port":     os.Getenv("DB_PORT"),
-		"user":     os.Getenv("DB_USER"),
-		"pw":       os.Getenv("DB_PASSWORD"),
-		"database": os.Getenv("DB_DATABASE"),
-	}
-	//fmt.Printf("%+v", conn)
-	caller := database.DBCalls{}
-	database.Init(caller, conn)
-	handlers = products.GetHandlers(caller)
+	handlers = products.Product{}
 }
 
 /* Don't forget to `source .env` */
@@ -49,11 +38,11 @@ func TestGetAll(t *testing.T) {
 	}
 
 	//fmt.Printf("%+v", arrOfProducts)
-	assert.Equal(t, 9, len(arrOfProducts))
-	assert.Equal(t, "brand A", arrOfProducts[0].Brand)
-	assert.Equal(t, "Description 1", arrOfProducts[0].Description)
-	assert.Equal(t, "THD-1", arrOfProducts[0].Sku)
-	assert.Equal(t, 999, arrOfProducts[0].Price)
+	assert.Equal(t, 2, len(arrOfProducts))
+	assert.Equal(t, "Milwaukee", arrOfProducts[0].Brand)
+	assert.Equal(t, "M18 FUEL 18-Volt Lithium-Ion Brushless Cordless Jig Saw (Tool Only)", arrOfProducts[0].Description)
+	assert.Equal(t, "2737-20", arrOfProducts[0].Sku)
+	assert.Equal(t, 199, arrOfProducts[0].Price)
 }
 func TestGetOne(t *testing.T) {
 	setup()
@@ -69,12 +58,12 @@ func TestGetOne(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, 1, prod.Id)
-	assert.Equal(t, "Product 1", prod.Name)
-	assert.Equal(t, "brand A", prod.Brand)
-	assert.Equal(t, "Description 1", prod.Description)
-	assert.Equal(t, "THD-1", prod.Sku)
-	assert.Equal(t, 4.2, prod.Rating)
-	assert.Equal(t, 999, prod.Price)
+	assert.Equal(t, "SAWZALL Saw Blades", prod.Name)
+	assert.Equal(t, "SAWZALL", prod.Brand)
+	assert.Equal(t, "Demolition Nail-Embedded Wood and Metal Cutting Bi-Metal Reciprocating Saw Blade Set", prod.Description)
+	assert.Equal(t, "49-22-5670", prod.Sku)
+	assert.Equal(t, 4.5, prod.Rating)
+	assert.Equal(t, 202, prod.Price)
 }
 
 func TestPostNew(t *testing.T) {
@@ -129,7 +118,7 @@ func TestDelete(t *testing.T) {
 	setup()
 	ts := httptest.NewServer(http.HandlerFunc(handlers.Remove))
 	client := &http.Client{}
-	req, err := http.NewRequest("DELETE", ts.URL+"/api/products/9", nil)
+	req, err := http.NewRequest("DELETE", ts.URL+"/api/products/1", nil)
 	assert.Nil(t, err)
 	res, err := client.Do(req)
 	assert.Nil(t, err)
@@ -137,6 +126,6 @@ func TestDelete(t *testing.T) {
 	actual, err := ioutil.ReadAll(res.Body)
 	assert.Nil(t, err)
 
-	assert.Contains(t, string(actual), "Deleted item with id: 9")
+	assert.Contains(t, string(actual), "Deleted item with id: 1")
 }
 
