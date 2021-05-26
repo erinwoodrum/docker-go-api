@@ -7,12 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.homedepot.com/EMC4JQ2/docker-go-api/database"
 )
 
 type Product struct {
-	db           database.DBCaller
 	Id           int
 	Name         string
 	Brand        string
@@ -25,31 +22,14 @@ type Product struct {
 	DepartmentId int       `json:"department_id" db:"department_id"`
 }
 
-func GetHandlers(dbcaller database.DBCaller) Product {
-	return Product{db: dbcaller}
+var allproducts = []Product{
+	Product{0, "Cordless Jig Saw", "Milwaukee", "M18 FUEL 18-Volt Lithium-Ion Brushless Cordless Jig Saw (Tool Only)", "2737-20", 5.0, 199, time.Now(), time.Now(), 1},
+	Product{1, "SAWZALL Saw Blades", "SAWZALL", "Demolition Nail-Embedded Wood and Metal Cutting Bi-Metal Reciprocating Saw Blade Set", "49-22-5670", 4.5, 202, time.Now(), time.Now(), 1},
 }
+var maxId = 1
 
 func (p *Product) GetAll(w http.ResponseWriter, r *http.Request) {
-	var retArr []Product
-	rows, err := p.db.GetFromDB("select * from products;")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if rows == nil {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	for rows.Next() {
-		one := Product{}
-		if err := rows.Scan(&one.Id, &one.Name, &one.Brand, &one.Description, &one.Sku, &one.Rating, &one.Price, &one.CreatedAt, &one.UpdatedAt, &one.DepartmentId); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		retArr = append(retArr, one)
-	}
-
-	jsn, err := json.Marshal(retArr)
+	jsn, err := json.Marshal(allproducts)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -63,15 +43,11 @@ func (p *Product) PostNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to decode "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	query := fmt.Sprintf("INSERT INTO products (name, brand, description, sku, rating, price, department_id) VALUES ('%v', '%v', '%v', '%v', %v, %v, %v) returning id;", p.Name, p.Brand, p.Description, p.Sku, p.Rating, p.Price, p.DepartmentId)
-	fmt.Println(query)
-	id, err := p.db.AddToDB(query)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	maxId++
+	p.Id = maxId
+	allproducts = append(allproducts, *p)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("Created new item with id: %v", id)))
+	w.Write([]byte(fmt.Sprintf("Created new item with id: %v", p.Id)))
 }
 
 func (p *Product) GetOne(w http.ResponseWriter, r *http.Request) {
@@ -80,12 +56,15 @@ func (p *Product) GetOne(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	p.Id = id
-	query := fmt.Sprintf("SELECT * FROM products WHERE id = %v", id)
-	row := p.db.GetOneFromDB(query)
-	err = row.Scan(&p.Id, &p.Name, &p.Brand, &p.Description, &p.Sku, &p.Rating, &p.Price, &p.CreatedAt, &p.UpdatedAt, &p.DepartmentId)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	found := false
+	for _, prod := range allproducts {
+		if prod.Id == id {
+			p = &prod
+			found = true
+		}
+	}
+	if !found {
+		http.Error(w, "product with that id not found.", http.StatusBadRequest)
 		return
 	}
 	jsn, err := json.Marshal(p)
@@ -103,16 +82,20 @@ func (p *Product) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/api/products/"))
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	p.Id = id
-	query := fmt.Sprintf("UPDATE products SET name = '%v', brand = '%v', description = '%v', sku = '%v', rating = %v, price = %v, department_id = %v  WHERE id = %v;", p.Name, p.Brand, p.Description, p.Sku, p.Rating, p.Price, p.DepartmentId, p.Id)
-	fmt.Println(query)
-	err = p.db.AlterInDB(query)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	found := false
+	for i, prod := range allproducts {
+		if prod.Id == id {
+			allproducts[i] = *p
+			found = true
+		}
+	}
+	if !found {
+		http.Error(w, "product with that id not found", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -125,12 +108,20 @@ func (p *Product) Remove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	p.Id = id
-	query := fmt.Sprintf("DELETE FROM products WHERE id = %v ;", p.Id)
-	err = p.db.AlterInDB(query)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	found := false
+	newProducts := []Product{}
+	for _, v := range allproducts {
+		if v.Id != id {
+			newProducts = append(newProducts, v)
+		} else {
+			found = true
+		}
+	}
+	if !found {
+		http.Error(w, "Product with that id does not exist", http.StatusBadRequest)
 		return
+	} else {
+		allproducts = newProducts
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(fmt.Sprintf("Deleted item with id: %v", p.Id)))
